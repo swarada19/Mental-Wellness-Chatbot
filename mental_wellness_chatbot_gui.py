@@ -1,11 +1,7 @@
-# mental_wellness_chatbot_gui.py
-
 import tkinter as tk
-from tkinter import scrolledtext, messagebox, simpledialog  # Add simpledialog here
+from tkinter import scrolledtext, messagebox, simpledialog
+import sqlite3
 import datetime
-
-# Simple database to store mood entries
-mood_entries = []
 
 class MentalWellnessChatbot:
     def __init__(self, master):
@@ -36,7 +32,14 @@ class MentalWellnessChatbot:
     def track_mood(self, mood):
         """Tracks the user's mood with a timestamp."""
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        mood_entries.append({"mood": mood, "timestamp": timestamp})
+
+        # Store the mood in the database
+        conn = sqlite3.connect('mood_tracker.db')
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO moods (mood, timestamp) VALUES (?, ?)", (mood, timestamp))
+        conn.commit()
+        conn.close()
+
         self.append_chat(f"Mood recorded: {mood}")
 
     def guided_breathing(self):
@@ -61,11 +64,17 @@ class MentalWellnessChatbot:
         self.append_chat(f"Prompt: {prompt}", sender="Chatbot")
 
     def show_mood_log(self):
-        """Displays the logged moods."""
+        """Displays the logged moods from the database."""
+        conn = sqlite3.connect('mood_tracker.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT mood, timestamp FROM moods ORDER BY timestamp DESC")
+        mood_entries = cursor.fetchall()
+        conn.close()
+
         if not mood_entries:
             self.append_chat("No mood entries found.", sender="Chatbot")
         else:
-            log = "\n".join([f"{entry['timestamp']}: {entry['mood']}" for entry in mood_entries])
+            log = "\n".join([f"{timestamp}: {mood}" for mood, timestamp in mood_entries])
             self.append_chat(f"Mood Log:\n{log}", sender="Chatbot")
 
     def process_input(self, event=None):
@@ -94,8 +103,24 @@ class MentalWellnessChatbot:
 
         self.user_input.set("")  # Clear the input field
 
+def create_database():
+    #Creates the SQLite database and the moods table if it doesn't exist.
+    conn = sqlite3.connect('mood_tracker.db')
+    cursor = conn.cursor()
+
+    # Create table if it doesn't exist
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS moods (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mood TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
 if __name__ == "__main__":
     root = tk.Tk()
+    create_database()  # Create the database when the app starts
     chatbot = MentalWellnessChatbot(root)
     root.mainloop()
